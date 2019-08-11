@@ -91,7 +91,19 @@ In the following section, we go over some examples provided in this repository t
 
 #### `main.c`
 
+The first example we will look at is `main.c` that contains a `main()` function which does nothing but return. Open up `main.c` in a text editor:
 
+```bash
+$ vim main.c
+```
+
+Study it for a bit, then use the Make target `main.s` to generate the assembly code, then open the assembly code with your favorite text editor:
+
+```bash
+$ make main.s
+gcc -O0 -Wall -S main.c -o main.s
+$ vim main.s
+```
 
 ## References
 <sup>1</sup>http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
