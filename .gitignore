@@ -1,5 +1,6 @@
 # Assembly source files
-*.s
+main.s
+manyargs.s
 *.swp
 
 # Prerequisites
