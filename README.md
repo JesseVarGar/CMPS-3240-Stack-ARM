@@ -1,3 +1,45 @@
+# CMPS 3240 Lab: Control of flow with ARM
+
+## Objectives
+
+During this lab you will:
+
+* Learn about ARM64 stack linkage
+* Use `gcc` to assemble examples of ARM stack linkage
+* Implement a recursive version of Fibonacci
+
+## Prerequisites
+
+This lab assumes you have read or are familiar with the following topics:
+
+* Different parts of memory
+* The stack
+* The idea of stack linkage
+* The idea of stack frames / frame records
+* ARM64 stack linkage<sup>1</sup>
+
+Please study these topics if you are not familiar with them so that the lab can be completed in a timely manner.
+
+## Requirements
+
+The following is a list of requirements to complete the lab. Some labs can completed on any machine, whereas some require you to use a specific departmental teaching server. You will find this information here.
+
+### Software
+
+We will use the following programs:
+
+* `gcc`
+* `git`
+* `gdb`
+
+### Compatability
+
+This lab requires the departmental ARM server. It will not work on `odin.cs.csubak.edu`, `sleipnir.cs.csubak.edu`, other PCs, etc. that have x86 processors. It may work on a Raspberry Pi or similar system on chip with ARM, but it must be ARMv8-a.
+
+| Linux | Mac | Windows |
+| :--- | :--- | :--- |
+| Limited | No | No |
+
 ## Background
 
 The purpose of this lab is to understand stack linkage (also called calling convention or call convention). A stack linkage defines how processes interact with each other. It defines how the stack should be used, what the caller and callee behavior are, and how the registers should be used. So, which stack linkage should be used? A process uses a specific linkage depending on the instruction set architecture (ISA) being used, and what operating system you're using. Some examples are Microsoft x64 calling convention and System V AMD64 ABI for x86-64 ISAs.<sup>a</sup> With low-level systems applications,  a project may implement their own stack linkage and long-running, legacy projects may have multiple stack linkages within the same project.<sup>b</sup> ARM has a specific stack linkage defined in the following document and this will be the topic of the lab today.<sup>1, c</sup> 
@@ -152,7 +194,7 @@ ret
 
 Beyond that it does not really allocate additional stack space. The `ldp` instruction, using a post-index, both restores the link register and frame pointer and reverts the stack pointer (also called popping the stack). You should also look at `main`, it does something similar.
 
-# `manyargs.c`
+#### `manyargs.c`
 
 This example contains a function that demonstrates passing arguments. A function adds 11 numbers together, which exceeds the number of registers designated as argument registers. We should see behavior for the callee expecting arguments on the stack. Open up `manyargs.c`:
 
@@ -184,6 +226,28 @@ int fact( int n ) {
 ```
 
 Carefully study this code. You may want to do a hand-trace to understand it.
+
+## Technical Approach
+
+In a previous lab we implemented an interative version of Fibonacci code. We were not able to implement a recursive version because we had not yet covered how to generate function scope (the underlying frame record). In this lab, using `fact.s` as a baseline code, modify the code to generate a Fibonacci number. For reference, here is the C-language code:
+
+```c
+int fib( int n ) {
+	if (n == 0)
+		return 0;
+	else if (n == 1)
+		return 1;
+	else {
+		return fib( n - 2 ) + fib( n - 1 );
+	}
+}
+```
+
+Alternatively, you can condense the first two `if` blocks to `if (n <= 1) { return n; }`. Though you are using `gcc` to assemble and link your code, it is not permitted to have `gcc` generate your Fibonacci code for you. Your work must be original.
+
+## Check off
+
+For full credit, show the instructor that your code can calculate the 13th Fibonacci number.
 
 ## References
 <sup>1</sup>http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
