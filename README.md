@@ -8,29 +8,32 @@ A stack linkage specifies the following:
 2. How the stack should be used
 3. Behavior of how a subroutine calls another subroutine. The subroutine making the call is called the *caller*. The subroutine being called is called the *callee*.
 
-
 For this lab, the number of arguments passed between the callee and caller should be known and fixed.<sup>d</sup>
 
 ### Registers
 
 Some registers are *saved registers*. That is, if a callee uses the register--modifies the values originally in the register--they must be restored by the callee before returning to the caller. Other registers are *unsaved registers*. The callee can freely use and clobber the values in these registers, and does not need to restore their original values. The ARM calling convention specifies the following:
 
-* Registers 0 to 7 are unsaved registers for passing arguments and returning values<sup>e</sup>
+* Registers 0 to 7 are unsaved registers for passing arguments<sup>e</sup>
+* A subroutine passes the return value through register 0
 * Registers 9 to 15 are unsaved registers for scratch work
 * Registers 19 to 28 are saved registers for scratch work 
 * Register 29 is a saved register, called the *frame pointer*
-* Register 30 is a saved register, called the *link pointer*. It contains the return address of the caller and is automatically handled for us by `bl` and `ret` instructions.
+* Register 30 is a saved register, called the *link pointer*. `bl` places the return address in this register and then jumps. `ret` returns to the address specified in this register.
 * The stack pointer (`sp`) register is a saved register that should always point to the end of the stack. Values higher than `sp` contain valid data. Values lower than `sp` contain garbage. 
 * Other registers not described here have specific purposes that go beyond the scope of this class.
 
 ### Stack
 
-The stack can be thought of as a single-index array that holds temporary variables and data used by the current process. Generally it starts at a high addresses and grows downward. There is a pointer called the stack pointer `sp` that points to bottom of the stack. When a process needs stack space it allocates space by subtracting the stack pointer (recall that it starts high and grows downward). It is then free to use this newly allocated space (between the old value of the stack pointer and the new value). This are is called a *stack record* or frame. Specific to ARM calling convention, the frame pointer should point to the starting address of the previous stack record. Thus, stack records in ARM form a linked list. This is different from other calling conventions.<sup>f</sup>
+The stack lives in the memory. It holds temporary variables and data used by the current process. Generally it starts at a high addresses and grows downward. There is a pointer called the stack pointer `sp` that points to bottom of the stack. When a process needs stack space it allocates space by subtracting the stack pointer (recall that it starts high and grows downward). It is then free to use this newly allocated space (between the old value of the stack pointer and the new value). This area is called a *stack record* or frame. There is a danger that uncontrolled growth of the stack will cause it to grow into other parts of the memory, such as the heap.
+
+Specific to the environment in this course the frame pointer should shadow the stack pointer. The old value of the frame pointer should be shadowed onto the stack. Thus, the stack records in ARM form a linked list. This is different from other calling conventions.<sup>f</sup>
 
 ARM calling convention also specifies the following:
-* The lowest addressed double word in the frame record should point to the previous frame record. The highest addressed double-word shall contain the value passed in LR on entry to the current function. 
-* The stack must be quad word aligned. That is, even if you only intend to use a byte or word (4 bytes), you must increment the stack pointer in units of 16 bytes. 
-* To save values onto the stack you must move the stack pointer (such as `sub` or pre-indexed addressing) and then use `str` or `stp` instruction to place the values relative to `sp`.<sup>g</sup> Example:
+* The lowest addressed double-word in the frame record should contain the old frame pointer
+* The second lowest addressed double-word in the frame record should contain the value passed in LR on entry to the current function 
+* The stack must be quad word aligned
+* To save values onto the stack the stack pointer must have been moved beforehand, or allocate space as needed with an arithmetic operation (such as `sub` or pre-indexed addressing). Then, use `str` or `stp` instruction to place the values relative to `sp`.<sup>g</sup> Example:
 ```arm
 # Simple example
 sub sp, sp, 16
@@ -38,7 +41,7 @@ str x0, [sp, 16]
 ```
 Another example using pre-indexing:
 ```arm
-# Recall that pre-index modifies the pointer
+# Recall that pre-index modifies the pointer before dereference
 str x0, [sp, 16]!
 ```
 * To load values from the stack use `ldr` or `ldp` commands pull values from the stack. Addressing is relative to `sp`.
@@ -55,35 +58,63 @@ After the above, the caller calls the callee with branch-and-link (`bl`) which s
 
 ### Callee Notes
 
-Things the callee should do before it's primary function:
+Things the callee should do the following:
 
-1. The callee allocates its frame record. So, one of the first instructions in a subroutine is to move the stack pointer `sp` with a `sub` instruction. Example:
+1. Set up its frame record. If this is a leaf function--it call no other subroutines--the first instruction is often to move the stack pointer `sp` with a `sub` instruction. Example:
 
 ```arm
-sub sp, sp, #32
+myfunc:
+sub sp, sp, 32
 ```
 
-However, we covered a lot of points above, and this is an example that adheres to everything:
+However, if it is a non-leaf function, it must comply with the points we discussed above. Here is an example that adheres to everything:
 
 ```arm
 myfunction:
-# In this example we allocate 5 blocks: 5 * 16 = 80 blocks plus
-# the required SP and LR space (so a total 96). 
-
-# The link pointer is shadowed to the highest point in the stack
-str x30, [sp, 8]
-# Save the previous frame pointer
-str x29, [sp, 96]
+# Suppose we want to pre-allocate 128 bytes. The stack pointer is placed
+# at the bottom of the frame record:
+str x29, [sp, -128]
+# The link register is copied just above it:
+str x30, [sp, 120]
+# Move the stack pointer
+sub sp, sp, 128
 # Set the current frame pointer
-add x30, sp, 0
-# Now move the stack pointer
-sub sp, sp, 96
+add x29, sp, 0
 ```
-Note this is not unique, you could have used pre-indexing here. Note that it is the simplest/laziest way to calculate the current frame pointer because we delay moving `sp`.
 
-2. The first 8 input arguments are shadowed. Use the `str` instruction to copy the input arguments onto the stack. The first argument is stored in the lowest position on the stack. Note that we do not need to shadow arguments that are on the stack because they were already placed onto the stack by the caller.
+Note this is not unique. You could also use the `stp` for a more elegant but perhaps less understandable code:
 
-When quitting, the callee should restore the stack pointer, link pointer and frame pointer to its original values before returning (`ret`).
+```arm
+myfunction:
+stp x29, x30, [sp, -128]!
+add x29, sp, 0
+```
+
+2. The first 8 input arguments are shadowed onto the stack. This is a standard operation specified by the convention, even if it may be wasteful. Use the `str` instruction to copy the input arguments onto the stack. The first argument is stored in the lowest position on the stack. Note that we do not need to shadow arguments that are on the stack because they were already placed onto the stack by the caller. Example:
+
+```arm
+myfunction: 
+# Some leaf
+sub sp, sp, 16
+ldr x0, [sp, 0]
+ldr x1, [sp, 8]
+```
+
+3. Perform the intended logic of the subroutine
+
+4. When quitting, the callee should restore the stack pointer, link pointer and frame pointer to its original values before returning (`ret`). Example:
+
+```arm
+myfunction:
+stp x29, x30, [sp, -128]!
+add x29, sp, 0
+...
+ldp x29, x30, [sp], 128
+ret
+```
+
+using `ldp` and post-indexing to both restore all the values and pop the stack (revert the pointer to its original value).
+
 
 ### Examples
 
@@ -91,7 +122,9 @@ In the following section, we go over some examples provided in this repository t
 
 #### `main.c`
 
-The first example we will look at is `main.c` that contains a `main()` function which does nothing but return. Open up `main.c` in a text editor:
+For these first two examples we will use `gcc` to generate assembly code for us. Normally we prefer to work from the ground up, but `gcc` generates code that must adhere to the calling convention, and should generate compliant example code for us.
+
+The first example we will look at is `main.c` that contains three functions that call each other and print a number to the screen. `main()` calls `foo()`, which calls `bar()` and then a number is printed to the screen. Open up `main.c` in a text editor:
 
 ```bash
 $ vim main.c
@@ -104,6 +137,53 @@ $ make main.s
 gcc -O0 -Wall -S main.c -o main.s
 $ vim main.s
 ```
+
+`bar` is pretty simple, it just returns the literal 43 through `w0`. The 0 register is the return register, and note that `w` is used because 43 is an integer which is only 32-bits.
+
+`foo` is the first function to implement a frame record. Note that it uses an `stp` instruction with pre-indexing to store both the old frame pointer and the link register:
+
+```arm
+stp x29, x30, [sp, -16]!
+add x29, sp, 0
+...
+ldp x29, x30, [sp], 16
+ret
+```
+
+Beyond that it does not really allocate additional stack space. The `ldp` instruction, using a post-index, both restores the link register and frame pointer and reverts the stack pointer (also called popping the stack). You should also look at `main`, it does something similar.
+
+# `manyargs.c`
+
+This example contains a function that demonstrates passing arguments. A function adds 11 numbers together, which exceeds the number of registers designated as argument registers. We should see behavior for the callee expecting arguments on the stack. Open up `manyargs.c`:
+
+```bash
+$ vim manyargs.c
+```
+
+Note that there is no `main()`, this example just details how to pass arguments. Also note that this is a leaf function, so setting up a frame record isn't required. Fire the correct make target and take a look at the source code:
+
+```bash
+$ make manyargs.s
+gcc -Wall -S manyargs.c -o manyargs.s
+$ vim manyargs.s
+```
+
+Note that shadowing the link pointer and the frame pointer are not required because this is a leaf function. However, by convention, we still shadow the input arguments to the stack, so we still decrement `sp`. The first set of `str` operations store the arguments in `x0` thru `x7` into consecutive positions on the stack. The compiler does a weird thing here. Even though the registers `x0` thru `x7` already contain the input arguments, it wastes operations here bringing the values from the stack into scratch registers. This is an example of how the compiler is not perfect and there is always room for improvement of the code at a low-level. Also note that arguments 9-11 are passed on the stack and the callee pulls them off the stack in the order described by the background section.
+
+#### `fact.s`
+
+This is the first non-trivial example, ARM code for a recursive function that implements the following C-language code snipet:
+
+```c
+int fact( int n ) {
+	if (n <= 1)
+		return 1;
+	else
+		return n * fact( n - 1 );
+}
+```
+
+Carefully study this code. You may want to do a hand-trace to understand it.
 
 ## References
 <sup>1</sup>http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
