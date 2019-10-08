@@ -115,12 +115,10 @@ However, if it is a non-leaf function, it must comply with the points we discuss
 myfunction:
 # Suppose we want to pre-allocate 128 bytes. The stack pointer is placed
 # at the bottom of the frame record:
-str x29, [sp, -128]
-# The link register is copied just above it:
-str x30, [sp, 120]
-# Move the stack pointer
-sub sp, sp, 128
-# Set the current frame pointer
+str x29, [sp, -128]!
+# Use pre-index to requisition stack space before saving x29. The link register is copied just above it:
+str x30, [sp, 8]
+# Set the current frame pointer. This seems weird but it is by convention. The frame records must form a link listed and point to each other
 add x29, sp, 0
 ```
 
