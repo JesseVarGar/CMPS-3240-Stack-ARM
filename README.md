@@ -134,7 +134,7 @@ add x29, sp, 0
 
 ```arm
 myfunction: 
-# Some leaf
+# Some leaf, only valid if there is more than 8 arguments!!
 sub sp, sp, 16
 ldr x0, [sp, 0]
 ldr x1, [sp, 8]
@@ -251,10 +251,17 @@ For full credit, show the instructor that your code can calculate the 13th Fibon
 <sup>1</sup>http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
 
 ## Footnotes
+
 <sup>a</sup>If you ever wondered why you can't run a Windows binary on a Linux machine even if they both have an x86 processor, this is one of the many reasons
+
 <sup>b</sup>This happens often with military and aerospace applications
+
 <sup>c</sup>This document may use different register prefixes from what is used with Linux ARM mnemonics. E.g., `r` vs. `x`.
+
 <sup>d</sup>Variadic subroutines--varying number of arguments--are allowed in ARM, but we do not cover them in this class
+
 <sup>e</sup>System calls use a reduced number of registers for passing arguments
+
 <sup>f</sup>For example, with MIPS, the frame pointer should only point to the top of the current frame record
+
 <sup>g</sup>Be careful getting help on the internet here, previous versions of ARM had `push` and `pop` instructions that no longer exist with ARM64
